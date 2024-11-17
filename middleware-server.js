@@ -25,3 +25,49 @@ const users = [
   { username: "johnstm", password: "mkonjiuh" },
   { username: "jackson", password: "qscwdvb" },
 ];
+
+const userMatch = (username, password) =>
+  users.find(
+    (user) => user.username === username && user.password === password
+  );
+
+const isUserLoggedIn = (socket, next) => {
+  const { session } = socket.request;
+  if (session && session.isLogged) {
+    next();
+  }
+};
+
+const namespace = {
+  home: io.of("/home").use(isUserLoggedIn),
+  login: io.of("/login"),
+};
+
+namespace.login.on("connection", (socket) => {
+  socket.use((packet, next) => {
+    const [evtName, data] = packet;
+    const user = data;
+    if (evtName === "tryLogin" && user.username === "johnstm") {
+      socket.emit("loginError", {
+        message: "Banned user!",
+      });
+    } else {
+      next();
+    }
+  });
+  socket.on("tryLogin", (userData) => {
+    const { username, password } = userData;
+    const request = socket.request;
+    if (userMatch(username, password)) {
+      request.session = {
+        isLogged: true,
+        username,
+      };
+      socket.emit("loginSuccess");
+    } else {
+      socket.emit("loginError", {
+        message: "invalid credentials",
+      });
+    }
+  });
+});
